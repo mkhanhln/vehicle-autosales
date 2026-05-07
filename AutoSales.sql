@@ -205,40 +205,66 @@ FROM dbo.Cleaned_CarPrices
 GROUP BY FLOOR([Mileage]/20000)*20000 
 ORDER BY Mileage_Bracket DESC;
 
+
 -- Q11: Year-over-Year Depreciation (LAG Function)
--- Requirement: Use the LAG function to calculate the dollar value drop for each year of a vehicle's age.
+SELECT [Vehicle Age], CAST(AVG([Sale Price]) AS DECIMAL(10,2)) AS Avg_Price,
+       CAST(LAG(AVG([Sale Price])) OVER (ORDER BY [Vehicle Age]) - AVG([Sale Price]) AS DECIMAL(10,2)) AS Annual_Value_Drop
+FROM dbo.Cleaned_CarPrices GROUP BY [Vehicle Age] ORDER BY [Vehicle Age];
 
 -- Q12: The 100k-Mile Psychological Barrier
--- Requirement: Compare average prices of cars just under 100k miles vs just over 100k miles.
+SELECT CASE WHEN [Mileage] < 100000 THEN 'Pre-100k' ELSE 'Post-100k' END AS Milestone, 
+       CAST(AVG([Sale Price]) AS DECIMAL(10,2)) AS Avg_Price
+FROM dbo.Cleaned_CarPrices WHERE [Mileage] BETWEEN 90000 AND 110000
+GROUP BY CASE WHEN [Mileage] < 100000 THEN 'Pre-100k' ELSE 'Post-100k' END;
+
 
 -- =============================================
 -- MODULE 4: GEOGRAPHICAL & SELLER PERFORMANCE
 -- =============================================
 
 -- Q13: Regional Sales Hotspots (State Volume)
--- Requirement: List the top 5 states by total sales count.
+SELECT TOP 5 [State Code], COUNT(*) AS Sales_Count FROM dbo.Cleaned_CarPrices GROUP BY [State Code] ORDER BY Sales_Count DESC;
 
 -- Q14: Cross-State Price Arbitrage (Truck Segment)
--- Requirement: Find the average price of Pickup Trucks by State to identify high-profit regions.
+SELECT [State Code], CAST(AVG([Sale Price]) AS DECIMAL(10,2)) AS Avg_Price, COUNT(*) AS Vol
+FROM dbo.Cleaned_CarPrices WHERE [Body Type] = 'Pickup Truck' 
+GROUP BY [State Code] HAVING COUNT(*) > 100 ORDER BY Avg_Price DESC;
 
 -- Q15: Seller Revenue Concentration (Total Sales per Seller)
--- Requirement: List the top 10 sellers by total gross revenue, formatted to 2 decimal places.
+SELECT TOP 10 [Seller], CAST(SUM([Sale Price]) AS DECIMAL(15,2)) AS Total_Revenue 
+FROM dbo.Cleaned_CarPrices GROUP BY [Seller] ORDER BY Total_Revenue DESC;
 
 -- Q16: State-Level Quality Audit (Source Optimization)
--- Requirement: Find the average raw condition score per state to identify where the "cleanest" cars are located.
+SELECT [State Code], CAST(AVG([Raw Condition]) AS DECIMAL(10,2)) AS Avg_Condition 
+FROM dbo.Cleaned_CarPrices GROUP BY [State Code] ORDER BY Avg_Condition DESC;
+
 
 -- =============================================
 -- MODULE 5: ADVANCED BI & EXECUTIVE REPORTING
 -- =============================================
 
 -- Q17: Best-Selling Model per Brand (CTE + DENSE_RANK)
--- Requirement: For every brand, identify the specific model that sells the most volume.
+WITH ModelRank AS (
+    SELECT [Make], [Model], COUNT(*) AS Vol, DENSE_RANK() OVER(PARTITION BY [Make] ORDER BY COUNT(*) DESC) as rnk 
+    FROM dbo.Cleaned_CarPrices GROUP BY [Make], [Model])
+SELECT [Make], [Model], Vol FROM ModelRank WHERE rnk = 1 ORDER BY Vol DESC;
 
 -- Q18: Luxury Tier Outlier Detection (Top 1% Percentile)
--- Requirement: Isolate the top 1% of the most expensive vehicles using the PERCENT_RANK function.
+SELECT [Make], [Model], CAST([Sale Price] AS DECIMAL(10,2)) AS Sale_Price 
+FROM (SELECT *, PERCENT_RANK() OVER(ORDER BY [Sale Price]) AS p_rank FROM dbo.Cleaned_CarPrices) t 
+WHERE p_rank > 0.99 ORDER BY [Sale Price] DESC;
 
 -- Q19: Sales Momentum (7-Day Rolling Average)
--- Requirement: Calculate daily volume and a rolling 7-day average of units sold over time.
+SELECT [Date of Sale], COUNT(*) AS Daily_Vol,
+       CAST(AVG(COUNT(*)) OVER(ORDER BY [Date of Sale] ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS DECIMAL(10,2)) AS Rolling_7Day_Avg
+FROM dbo.Cleaned_CarPrices GROUP BY [Date of Sale];
 
 -- Q20: The Executive Summary (Final Report View)
--- Requirement: Create a VIEW named [dbo.v_Executive_Brand_Health] summarizing Volume, Price, and Margin.
+CREATE OR ALTER VIEW dbo.v_Executive_Brand_Health AS
+SELECT [Make], COUNT(*) AS Total_Volume, 
+       CAST(AVG([Sale Price]) AS DECIMAL(10,2)) AS Avg_Price, 
+       CAST(AVG([Profit/Loss]) AS DECIMAL(10,2)) AS Avg_Margin
+FROM dbo.Cleaned_CarPrices GROUP BY [Make] HAVING COUNT(*) > 500;
+GO
+
+SELECT * FROM dbo.v_Executive_Brand_Health ORDER BY Total_Volume DESC;
