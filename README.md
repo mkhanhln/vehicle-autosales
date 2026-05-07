@@ -23,7 +23,7 @@ This project builds a full analytics pipeline on a real-world automotive auction
 
 ---
 
-## 🛠️ Tools & Technologies
+## Tools & Technologies
 
 | Category | Tools |
 |---|---|
