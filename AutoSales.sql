@@ -17,7 +17,7 @@ CREATE TABLE dbo.CarPrices (
     [sellingprice] FLOAT, [saledate] NVARCHAR(100) 
 );
 GO
-BULK INSERT dbo.CarPrices FROM 'C:\Users\mkhan\Downloads\Vehicle Sales Project\car_prices.csv'
+BULK INSERT dbo.CarPrices FROM 'data/car_prices.csv'
 WITH (FORMAT = 'CSV', FIRSTROW = 2, FIELDTERMINATOR = ',', ROWTERMINATOR = '\n', TABLOCK);
 GO
 -- =============================================
